@@ -75,9 +75,10 @@ group_sessions_per_user: false
 ### Telegram
 
 1. Create a bot via [@BotFather](https://t.me/BotFather)
-2. Set `TELEGRAM_BOT_TOKEN` in `~/.hermes/.env`
-3. Add the bot to your group
-4. The bot sees all messages for context, responds when @mentioned (configurable via `telegram_require_mention` in config.yaml)
+2. **Restrict group access:** Send `/setjoingroups` to @BotFather and select "Disable". This prevents anyone from adding the bot to random groups. You can still add it to your team group manually.
+3. Set `TELEGRAM_BOT_TOKEN` in `~/.hermes/.env`
+4. Add the bot to your team group
+5. The bot sees all messages for context, responds when @mentioned (configurable via `telegram_require_mention` in config.yaml)
 
 ### Mattermost
 
