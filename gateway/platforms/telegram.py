@@ -2392,11 +2392,15 @@ class TelegramAdapter(BasePlatformAdapter):
         """
         if not update.message or not update.message.text:
             return
-        if not self._should_process_message(update.message):
+        _should_respond = self._should_process_message(update.message)
+        if not _should_respond and not self._is_group_chat(update.message):
             return
 
         event = self._build_message_event(update.message, MessageType.TEXT, update_id=update.update_id)
-        event.text = self._clean_bot_trigger_text(event.text)
+        if not _should_respond:
+            event.observe_only = True
+        else:
+            event.text = self._clean_bot_trigger_text(event.text)
         self._enqueue_text_event(event)
     
     async def _handle_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

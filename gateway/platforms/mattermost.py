@@ -611,6 +611,7 @@ class MattermostAdapter(BasePlatformAdapter):
 
         # For DMs, user_id is sufficient.  For channels, check for @mention.
         message_text = post.get("message", "")
+        _observe_only = False
 
         # Mention-gating for non-DM channels.
         # Config (env vars):
@@ -635,11 +636,7 @@ class MattermostAdapter(BasePlatformAdapter):
             )
 
             if require_mention and not is_free_channel and not has_mention:
-                logger.debug(
-                    "Mattermost: skipping non-DM message without @mention (channel=%s)",
-                    channel_id,
-                )
-                return
+                _observe_only = True
 
             # Strip @mention from the message text so the agent sees clean input.
             if has_mention:
@@ -732,6 +729,7 @@ class MattermostAdapter(BasePlatformAdapter):
             media_urls=media_urls if media_urls else None,
             media_types=media_types if media_types else None,
             channel_prompt=_channel_prompt,
+            observe_only=_observe_only,
         )
 
         await self.handle_message(msg_event)

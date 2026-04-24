@@ -3155,39 +3155,43 @@ class GatewayRunner:
             logger.debug("Ignoring message with no user_id from %s", source.platform.value)
             return None
         elif not self._is_user_authorized(source):
-            logger.warning("Unauthorized user: %s (%s) on %s", source.user_id, source.user_name, source.platform.value)
-            # In DMs: offer pairing code. In groups: silently ignore.
-            if source.chat_type == "dm" and self._get_unauthorized_dm_behavior(source.platform) == "pair":
-                platform_name = source.platform.value if source.platform else "unknown"
-                # Rate-limit ALL pairing responses (code or rejection) to
-                # prevent spamming the user with repeated messages when
-                # multiple DMs arrive in quick succession.
-                if self.pairing_store._is_rate_limited(platform_name, source.user_id):
-                    return None
-                code = self.pairing_store.generate_code(
-                    platform_name, source.user_id, source.user_name or ""
-                )
-                if code:
-                    adapter = self.adapters.get(source.platform)
-                    if adapter:
-                        await adapter.send(
-                            source.chat_id,
-                            f"Hi~ I don't recognize you yet!\n\n"
-                            f"Here's your pairing code: `{code}`\n\n"
-                            f"Ask the bot owner to run:\n"
-                            f"`hermes pairing approve {platform_name} {code}`"
-                        )
-                else:
-                    adapter = self.adapters.get(source.platform)
-                    if adapter:
-                        await adapter.send(
-                            source.chat_id,
-                            "Too many pairing requests right now~ "
-                            "Please try again later!"
-                        )
-                    # Record rate limit so subsequent messages are silently ignored
-                    self.pairing_store._record_rate_limit(platform_name, source.user_id)
-            return None
+            # Channel/group messages: anyone present in the channel is
+            # implicitly authorized (membership IS the auth).  ALLOWED_USERS
+            # only gates DMs.
+            if source.chat_type not in ("group", "channel"):
+                logger.warning("Unauthorized user: %s (%s) on %s", source.user_id, source.user_name, source.platform.value)
+                if source.chat_type == "dm" and self._get_unauthorized_dm_behavior(source.platform) == "pair":
+                    platform_name = source.platform.value if source.platform else "unknown"
+                    # Rate-limit ALL pairing responses (code or rejection) to
+                    # prevent spamming the user with repeated messages when
+                    # multiple DMs arrive in quick succession.
+                    if self.pairing_store._is_rate_limited(platform_name, source.user_id):
+                        return None
+                    code = self.pairing_store.generate_code(
+                        platform_name, source.user_id, source.user_name or ""
+                    )
+                    if code:
+                        adapter = self.adapters.get(source.platform)
+                        if adapter:
+                            await adapter.send(
+                                source.chat_id,
+                                f"Hi~ I don't recognize you yet!\n\n"
+                                f"Here's your pairing code: `{code}`\n\n"
+                                f"Ask the bot owner to run:\n"
+                                f"`hermes pairing approve {platform_name} {code}`"
+                            )
+                    else:
+                        adapter = self.adapters.get(source.platform)
+                        if adapter:
+                            await adapter.send(
+                                source.chat_id,
+                                "Too many pairing requests right now~ "
+                                "Please try again later!"
+                            )
+                        # Record rate limit so subsequent messages are silently ignored
+                        self.pairing_store._record_rate_limit(platform_name, source.user_id)
+                return None
+            # Group/channel message from non-allowlisted user — allowed through
         
         # Intercept messages that are responses to a pending /update prompt.
         # The update process (detached) wrote .update_prompt.json; the watcher
@@ -3855,6 +3859,32 @@ class GatewayRunner:
         # Pending exec approvals are handled by /approve and /deny commands above.
         # No bare text matching — "yes" in normal conversation must not trigger
         # execution of a dangerous command.
+
+        # ── Observe-only: record in session context, skip agent ───────
+        # Messages the bot sees but doesn't respond to (e.g. channel messages
+        # without @mention).  Stored as "user" role so the LLM can read them
+        # as conversational context; tagged with observe_only so the gateway
+        # knows no response was generated.
+        if getattr(event, "observe_only", False):
+            session_entry = self.session_store.get_or_create_session(source)
+            ts = datetime.now().isoformat()
+            sender = source.user_name or source.user_id or "unknown"
+            content = event.text or ""
+            tagged_content = f"[{sender}]: {content}" if content else f"[{sender} sent a message]"
+            self.session_store.append_to_transcript(
+                session_entry.session_id,
+                {
+                    "role": "user",
+                    "content": tagged_content,
+                    "timestamp": ts,
+                    "observe_only": True,
+                },
+            )
+            logger.debug(
+                "Observed message from %s in %s (no response)",
+                sender, source.chat_id,
+            )
+            return None
 
         # ── Claim this session before any await ───────────────────────
         # Between here and _run_agent registering the real AIAgent, there

@@ -767,6 +767,15 @@ class SessionStore:
                 # existing ``.restart_failure_counts`` stuck-loop counter
                 # still converge to a clean slate.
                 if entry.suspended:
+                    policy = self.config.get_reset_policy(
+                        platform=source.platform,
+                        session_type=getattr(source, 'chat_type', 'dm'),
+                    )
+                    if policy.mode == "none":
+                        entry.suspended = False
+                        entry.updated_at = now
+                        self._save()
+                        return entry
                     reset_reason = "suspended"
                 elif entry.resume_pending:
                     # Restart-interrupted session: preserve the session_id

@@ -726,6 +726,11 @@ class MessageEvent:
     # completion notifications) that must bypass user authorization checks.
     internal: bool = False
 
+    # Observe-only flag — message is recorded in session context but does not
+    # trigger agent response.  Used for channel messages where the bot listens
+    # for context but only responds when @mentioned.
+    observe_only: bool = False
+
     # Timestamps
     timestamp: datetime = field(default_factory=datetime.now)
     
@@ -1905,14 +1910,24 @@ class BasePlatformAdapter(ABC):
     async def handle_message(self, event: MessageEvent) -> None:
         """
         Process an incoming message.
-        
+
         This method returns quickly by spawning background tasks.
         This allows new messages to be processed even while an agent is running,
         enabling interruption support.
         """
         if not self._message_handler:
             return
-        
+
+        # Observe-only messages bypass session locking and background tasks —
+        # they are recorded in the transcript by the runner but never trigger
+        # agent response generation.
+        if getattr(event, "observe_only", False):
+            try:
+                await self._message_handler(event)
+            except Exception as e:
+                logger.error("[%s] Observe-only handler failed: %s", self.name, e)
+            return
+
         session_key = build_session_key(
             event.source,
             group_sessions_per_user=self.config.extra.get("group_sessions_per_user", True),
