@@ -3870,6 +3870,23 @@ class GatewayRunner:
             ts = datetime.now().isoformat()
             sender = source.user_name or source.user_id or "unknown"
             content = event.text or ""
+
+            # Auto-transcribe voice/audio attachments for context
+            if not content and event.media_urls and event.media_types:
+                for url, mtype in zip(event.media_urls, event.media_types):
+                    if mtype.startswith("audio/"):
+                        try:
+                            from tools.transcription_tools import transcribe_audio
+                            import asyncio
+                            result = await asyncio.to_thread(transcribe_audio, url)
+                            if result.get("success"):
+                                content = f'[voice message: "{result["transcript"]}"]'
+                        except Exception as e:
+                            logger.debug("Observe-only transcription failed: %s", e)
+                if not content:
+                    content = "[shared media]"
+
+            # Prefix with sender name so the agent knows who said what
             tagged_content = f"[{sender}]: {content}" if content else f"[{sender} sent a message]"
             self.session_store.append_to_transcript(
                 session_entry.session_id,

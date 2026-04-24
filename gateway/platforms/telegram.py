@@ -2576,11 +2576,12 @@ class TelegramAdapter(BasePlatformAdapter):
         """Handle incoming media messages, downloading images to local cache."""
         if not update.message:
             return
-        if not self._should_process_message(update.message):
+        _should_respond = self._should_process_message(update.message)
+        if not _should_respond and not self._is_group_chat(update.message):
             return
-        
+
         msg = update.message
-        
+
         # Determine media type
         if msg.sticker:
             msg_type = MessageType.STICKER
@@ -2596,12 +2597,35 @@ class TelegramAdapter(BasePlatformAdapter):
             msg_type = MessageType.DOCUMENT
         else:
             msg_type = MessageType.DOCUMENT
-        
+
         event = self._build_message_event(msg, msg_type, update_id=update.update_id)
-        
+
         # Add caption as text
         if msg.caption:
             event.text = self._clean_bot_trigger_text(msg.caption)
+
+        # Observe-only: record metadata, auto-transcribe voice messages.
+        if not _should_respond:
+            event.observe_only = True
+            if msg_type == MessageType.VOICE and msg.voice:
+                try:
+                    file_obj = await msg.voice.get_file()
+                    audio_bytes = await file_obj.download_as_bytearray()
+                    cached_path = cache_audio_from_bytes(bytes(audio_bytes), ext=".ogg")
+                    from tools.transcription_tools import transcribe_audio
+                    import asyncio
+                    result = await asyncio.to_thread(transcribe_audio, cached_path)
+                    if result.get("success"):
+                        event.text = f'[voice message: "{result["transcript"]}"]'
+                    else:
+                        event.text = "[shared voice message]"
+                except Exception as e:
+                    logger.warning("[Telegram] Observe-only voice transcription failed: %s", e)
+                    event.text = "[shared voice message]"
+            elif not event.text:
+                event.text = f"[shared {msg_type.value}]"
+            await self.handle_message(event)
+            return
         
         # Handle stickers: describe via vision tool with caching
         if msg.sticker:
