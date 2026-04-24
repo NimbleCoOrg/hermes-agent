@@ -594,11 +594,8 @@ class MattermostAdapter(BasePlatformAdapter):
         if post.get("user_id") == self._bot_user_id:
             return
 
-        # Ignore system posts (join/leave/header changes etc.) but allow
-        # bot messages through — bots are legitimate participants in channels.
-        post_type = post.get("type", "")
-        if post_type and post_type.startswith("system_"):
-            return
+        # All post types are allowed through — system posts (join/leave/header
+        # changes) and bot messages are useful context for the agent.
 
         post_id = post.get("id", "")
 
