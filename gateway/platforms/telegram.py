@@ -2611,14 +2611,17 @@ class TelegramAdapter(BasePlatformAdapter):
                 try:
                     file_obj = await msg.voice.get_file()
                     audio_bytes = await file_obj.download_as_bytearray()
-                    cached_path = cache_audio_from_bytes(bytes(audio_bytes), ext=".ogg")
+                    cached_path = cache_audio_from_bytes(
+                        bytes(audio_bytes), ext=".ogg",
+                        chat_id=str(msg.chat.id), message_id=str(msg.message_id),
+                    )
                     from tools.transcription_tools import transcribe_audio
                     import asyncio
                     result = await asyncio.to_thread(transcribe_audio, cached_path)
                     if result.get("success"):
-                        event.text = f'[voice message: "{result["transcript"]}"]'
+                        event.text = f'[voice message: "{result["transcript"]}" (audio: {cached_path})]'
                     else:
-                        event.text = "[shared voice message]"
+                        event.text = f"[shared voice message (audio: {cached_path})]"
                 except Exception as e:
                     logger.warning("[Telegram] Observe-only voice transcription failed: %s", e)
                     event.text = "[shared voice message]"
@@ -2670,7 +2673,10 @@ class TelegramAdapter(BasePlatformAdapter):
             try:
                 file_obj = await msg.voice.get_file()
                 audio_bytes = await file_obj.download_as_bytearray()
-                cached_path = cache_audio_from_bytes(bytes(audio_bytes), ext=".ogg")
+                cached_path = cache_audio_from_bytes(
+                    bytes(audio_bytes), ext=".ogg",
+                    chat_id=str(msg.chat.id), message_id=str(msg.message_id),
+                )
                 event.media_urls = [cached_path]
                 event.media_types = ["audio/ogg"]
                 logger.info("[Telegram] Cached user voice at %s", cached_path)
@@ -2680,7 +2686,10 @@ class TelegramAdapter(BasePlatformAdapter):
             try:
                 file_obj = await msg.audio.get_file()
                 audio_bytes = await file_obj.download_as_bytearray()
-                cached_path = cache_audio_from_bytes(bytes(audio_bytes), ext=".mp3")
+                cached_path = cache_audio_from_bytes(
+                    bytes(audio_bytes), ext=".mp3",
+                    chat_id=str(msg.chat.id), message_id=str(msg.message_id),
+                )
                 event.media_urls = [cached_path]
                 event.media_types = ["audio/mp3"]
                 logger.info("[Telegram] Cached user audio at %s", cached_path)

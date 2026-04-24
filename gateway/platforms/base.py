@@ -467,25 +467,46 @@ def get_audio_cache_dir() -> Path:
     return AUDIO_CACHE_DIR
 
 
-def cache_audio_from_bytes(data: bytes, ext: str = ".ogg") -> str:
+def cache_audio_from_bytes(
+    data: bytes,
+    ext: str = ".ogg",
+    *,
+    chat_id: str | None = None,
+    message_id: str | None = None,
+) -> str:
     """
     Save raw audio bytes to the cache and return the absolute file path.
 
     Args:
         data: Raw audio bytes.
         ext:  File extension including the dot (e.g. ".ogg", ".mp3").
+        chat_id: Optional chat/channel identifier for traceability.
+        message_id: Optional message identifier for traceability.
 
     Returns:
         Absolute path to the cached audio file as a string.
     """
     cache_dir = get_audio_cache_dir()
-    filename = f"audio_{uuid.uuid4().hex[:12]}{ext}"
+    parts = ["audio"]
+    if chat_id:
+        parts.append(str(chat_id))
+    if message_id:
+        parts.append(str(message_id))
+    parts.append(uuid.uuid4().hex[:12])
+    filename = f"{'_'.join(parts)}{ext}"
     filepath = cache_dir / filename
     filepath.write_bytes(data)
     return str(filepath)
 
 
-async def cache_audio_from_url(url: str, ext: str = ".ogg", retries: int = 2) -> str:
+async def cache_audio_from_url(
+    url: str,
+    ext: str = ".ogg",
+    retries: int = 2,
+    *,
+    chat_id: str | None = None,
+    message_id: str | None = None,
+) -> str:
     """
     Download an audio file from a URL and save it to the local cache.
 
@@ -525,7 +546,7 @@ async def cache_audio_from_url(url: str, ext: str = ".ogg", retries: int = 2) ->
                     },
                 )
                 response.raise_for_status()
-                return cache_audio_from_bytes(response.content, ext)
+                return cache_audio_from_bytes(response.content, ext, chat_id=chat_id, message_id=message_id)
             except (httpx.TimeoutException, httpx.HTTPStatusError) as exc:
                 if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 429:
                     raise

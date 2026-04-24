@@ -684,7 +684,10 @@ class MattermostAdapter(BasePlatformAdapter):
                             media_types.append(mime)
                         elif mime.startswith("audio/"):
                             from gateway.platforms.base import cache_audio_from_bytes
-                            local_path = cache_audio_from_bytes(file_data, ext or ".ogg")
+                            local_path = cache_audio_from_bytes(
+                                file_data, ext or ".ogg",
+                                chat_id=channel_id, message_id=fid,
+                            )
                             media_urls.append(local_path)
                             media_types.append(mime)
                         else:

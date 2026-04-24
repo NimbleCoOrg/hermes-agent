@@ -3880,7 +3880,7 @@ class GatewayRunner:
                             import asyncio
                             result = await asyncio.to_thread(transcribe_audio, url)
                             if result.get("success"):
-                                content = f'[voice message: "{result["transcript"]}"]'
+                                content = f'[voice message: "{result["transcript"]}" (audio: {url})]'
                         except Exception as e:
                             logger.debug("Observe-only transcription failed: %s", e)
                 if not content:
