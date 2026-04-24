@@ -1,0 +1,23 @@
+# Hermes Agent — Single-agent deployment
+#
+# Setup:
+#   1. Copy .env.example to .env and fill in your keys
+#   2. Copy config.yaml.example to config.yaml and customize
+#   3. docker compose up -d
+#
+# Data lives in ~/.hermes/ on the host (mounted as /opt/data in container).
+# Edit ~/.hermes/.env for secrets, ~/.hermes/config.yaml for settings,
+# ~/.hermes/SOUL.md for the agent persona.
+
+services:
+  hermes:
+    build: .
+    container_name: hermes-agent
+    volumes:
+      - ~/.hermes:/opt/data
+    env_file:
+      - .env
+    ports:
+      - "8642:8642"
+    restart: unless-stopped
+    command: gateway

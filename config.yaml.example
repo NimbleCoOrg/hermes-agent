@@ -1,0 +1,31 @@
+# Hermes Agent Configuration
+# Copy to ~/.hermes/config.yaml (or let the container create it on first run)
+
+# -- Model --
+model:
+  default: "anthropic/claude-sonnet-4-20250514"
+  provider: "anthropic"
+
+# -- Session persistence --
+# Prevents conversation history from being wiped on container restart.
+# Options: none (keep forever), idle (reset after inactivity), daily
+session_reset:
+  mode: none
+
+# -- Group chat sessions --
+# false = everyone in a group/channel shares one session (recommended for teams)
+# true  = each person gets their own isolated session with the agent
+group_sessions_per_user: false
+
+# -- Telegram --
+# Bot responds to all messages in groups it's in, not just @mentions.
+# Set to true to require @mention in groups.
+# telegram_require_mention: false
+
+# -- Mattermost --
+# Bot requires @mention in channels (DMs always respond).
+# Set to false to respond to all channel messages.
+# mattermost_require_mention: true
+
+# -- Verbose logging --
+# verbose: true

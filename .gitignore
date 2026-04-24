@@ -46,6 +46,13 @@ testlogs
 # CLI config (may contain sensitive SSH paths)
 cli-config.yaml
 
+# Deployment secrets — never commit actual config/secrets
+config.yaml
+SOUL.md
+*.key
+*.json.key
+service-account*.json
+
 # Skills Hub state (lives in ~/.hermes/skills/.hub/ at runtime, but just in case)
 skills/.hub/
 ignored/
