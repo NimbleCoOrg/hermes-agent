@@ -473,6 +473,77 @@ class TestMattermostMentionBehavior:
             assert self.adapter.handle_message.called
 
     @pytest.mark.asyncio
+    async def test_slash_command_bypasses_mention_requirement(self):
+        """Slash commands should pass through even without @mention."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MATTERMOST_REQUIRE_MENTION", None)
+            os.environ.pop("MATTERMOST_FREE_RESPONSE_CHANNELS", None)
+            await self.adapter._handle_ws_event(self._make_event("/help"))
+            assert self.adapter.handle_message.called
+
+    @pytest.mark.asyncio
+    async def test_reply_to_bot_bypasses_mention_requirement(self):
+        """Replies to bot messages should pass through without @mention."""
+        post_data = {
+            "id": "post_reply",
+            "user_id": "user_123",
+            "channel_id": "chan_456",
+            "message": "thanks for that",
+            "root_id": "bot_root_post",
+        }
+        event = {
+            "event": "posted",
+            "data": {
+                "post": json.dumps(post_data),
+                "channel_type": "O",
+                "sender_name": "@alice",
+            },
+        }
+
+        # Mock _api_get to return a post authored by the bot
+        self.adapter._api_get = AsyncMock(return_value={
+            "id": "bot_root_post",
+            "user_id": "bot_user_id",
+        })
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MATTERMOST_REQUIRE_MENTION", None)
+            os.environ.pop("MATTERMOST_FREE_RESPONSE_CHANNELS", None)
+            await self.adapter._handle_ws_event(event)
+            assert self.adapter.handle_message.called
+
+    @pytest.mark.asyncio
+    async def test_reply_to_non_bot_still_requires_mention(self):
+        """Replies to non-bot messages should still require @mention."""
+        post_data = {
+            "id": "post_reply2",
+            "user_id": "user_123",
+            "channel_id": "chan_456",
+            "message": "replying to someone else",
+            "root_id": "other_user_post",
+        }
+        event = {
+            "event": "posted",
+            "data": {
+                "post": json.dumps(post_data),
+                "channel_type": "O",
+                "sender_name": "@alice",
+            },
+        }
+
+        # Mock _api_get to return a post NOT authored by the bot
+        self.adapter._api_get = AsyncMock(return_value={
+            "id": "other_user_post",
+            "user_id": "other_user_456",
+        })
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MATTERMOST_REQUIRE_MENTION", None)
+            os.environ.pop("MATTERMOST_FREE_RESPONSE_CHANNELS", None)
+            await self.adapter._handle_ws_event(event)
+            assert not self.adapter.handle_message.called
+
+    @pytest.mark.asyncio
     async def test_mention_stripped_from_text(self):
         """@mention is stripped from message text."""
         with patch.dict(os.environ, {}, clear=False):

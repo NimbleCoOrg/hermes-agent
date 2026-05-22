@@ -768,7 +768,21 @@ class MattermostAdapter(BasePlatformAdapter):
                 for pattern in mention_patterns
             )
 
-            if require_mention and not is_free_channel and not has_mention:
+            # Slash commands always pass through mention gating.
+            is_command = bool(message_text and message_text.strip().startswith("/"))
+
+            # Replies to bot messages pass through — the user is continuing
+            # a conversation the bot started.
+            is_reply_to_bot = False
+            root_id = post.get("root_id")
+            if root_id and not has_mention and not is_command:
+                try:
+                    root_post = await self._api_get(f"posts/{root_id}")
+                    is_reply_to_bot = root_post.get("user_id") == self._bot_user_id
+                except Exception:
+                    pass
+
+            if require_mention and not is_free_channel and not has_mention and not is_reply_to_bot and not is_command:
                 logger.debug(
                     "Mattermost: skipping non-DM message without @mention (channel=%s)",
                     channel_id,
