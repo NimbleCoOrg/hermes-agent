@@ -53,13 +53,12 @@ class HookRegistry:
         return list(self._loaded_hooks)
 
     def _register_builtin_hooks(self) -> None:
-        """Register built-in hooks that are always active.
-
-        Currently empty — no shipped built-in hooks. Kept as the extension
-        point for future always-on gateway hooks so they drop in without
-        re-plumbing discover_and_load().
-        """
-        return
+        """Register built-in hooks that are always active."""
+        try:
+            from gateway.builtin_hooks.boot_md import handle as boot_md_handle
+            self._handlers.setdefault("gateway:startup", []).append(boot_md_handle)
+        except Exception as e:
+            print(f"[hooks] Failed to load boot_md builtin hook: {e}", flush=True)
 
     def discover_and_load(self) -> None:
         """
