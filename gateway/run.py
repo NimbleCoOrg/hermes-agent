@@ -6801,6 +6801,42 @@ class GatewayRunner:
                     self.pairing_store._record_rate_limit(platform_name, source.user_id)
             return None
         
+        # ── Observe-only: record in session context, skip agent ───────
+        if getattr(event, "observe_only", False):
+            session_entry = self.session_store.get_or_create_session(source)
+            ts = datetime.now().isoformat()
+            sender = source.user_name or source.user_id or "unknown"
+            content = event.text or ""
+
+            if not content and event.media_urls and event.media_types:
+                for url, mtype in zip(event.media_urls, event.media_types):
+                    if mtype.startswith("audio/"):
+                        try:
+                            from tools.transcription_tools import transcribe_audio
+                            result = await asyncio.to_thread(transcribe_audio, url)
+                            if result.get("success"):
+                                content = f'[voice message: "{result["transcript"]}" (audio: {url})]'
+                        except Exception as e:
+                            logger.debug("Observe-only transcription failed: %s", e)
+                if not content:
+                    content = "[shared media]"
+
+            tagged_content = f"[{sender}]: {content}" if content else f"[{sender} sent a message]"
+            self.session_store.append_to_transcript(
+                session_entry.session_id,
+                {
+                    "role": "user",
+                    "content": tagged_content,
+                    "timestamp": ts,
+                    "observe_only": True,
+                },
+            )
+            logger.debug(
+                "Observed message from %s in %s (no response)",
+                sender, source.chat_id,
+            )
+            return None
+
         # Intercept messages that are responses to a pending /update prompt.
         # The update process (detached) wrote .update_prompt.json; the watcher
         # forwarded it to the user; now the user's reply goes back via
