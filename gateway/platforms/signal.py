@@ -670,6 +670,17 @@ class SignalAdapter(BasePlatformAdapter):
                         )
                         return
 
+        # Strip the bot's own @mention from the text so the agent sees clean
+        # input and commands like "/sethome" are correctly detected even when
+        # prefixed with a mention (e.g. "@+16893576460 /sethome").
+        if is_group and text and self._account_normalized:
+            import re as _re
+            for pattern in [
+                f"@{_re.escape(self._account_normalized)}",
+                f"@{_re.escape(self._account_normalized.lstrip('+'))}",
+            ]:
+                text = _re.sub(pattern, "", text, flags=_re.IGNORECASE).strip()
+
         # Extract quote (reply-to) context from Signal dataMessage
         quote_data = data_message.get("quote") or {}
         reply_to_id = str(quote_data.get("id")) if quote_data.get("id") else None
