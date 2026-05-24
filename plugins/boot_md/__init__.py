@@ -1,32 +1,24 @@
-"""Built-in boot-md hook — run ~/.hermes/BOOT.md on gateway startup.
+"""Boot.md plugin -- runs BOOT.md as a startup prompt on first session.
 
-This hook is always registered. It silently skips if no BOOT.md exists.
-To activate, create ``~/.hermes/BOOT.md`` with instructions for the
-agent to execute on every gateway restart.
-
-Example BOOT.md::
-
-    # Startup Checklist
-
-    1. Check if any cron jobs failed overnight
-    2. Send a status update to Discord #general
-    3. If there are errors in /opt/app/deploy.log, summarize them
-
-The agent runs in a background thread so it doesn't block gateway
-startup. If nothing needs attention, it replies with [SILENT] to
-suppress delivery.
+Reads ~/.hermes/BOOT.md on the first session start and sends it as
+a one-shot agent prompt in a background thread. If nothing needs
+attention, the agent replies with [SILENT] and the message is suppressed.
 """
 
 import logging
 import threading
 from pathlib import Path
 
-from hermes_cli.config import get_hermes_home
+logger = logging.getLogger(__name__)
 
-logger = logging.getLogger("hooks.boot-md")
 
-HERMES_HOME = get_hermes_home()
-BOOT_FILE = HERMES_HOME / "BOOT.md"
+def _get_boot_file() -> Path:
+    """Get the BOOT.md path from HERMES_HOME."""
+    from hermes_cli.config import get_hermes_home
+    return get_hermes_home() / "BOOT.md"
+
+
+_boot_executed = False
 
 
 def _build_boot_prompt(content: str) -> str:
@@ -66,18 +58,22 @@ def _run_boot_agent(content: str) -> None:
         logger.error("boot-md agent failed: %s", e)
 
 
-async def handle(event_type: str, context: dict) -> None:
-    """Gateway startup handler — run BOOT.md if it exists."""
-    if not BOOT_FILE.exists():
+def _on_session_start(session_id: str = "", **kwargs) -> None:
+    """Run BOOT.md on first session start only."""
+    global _boot_executed
+    if _boot_executed:
+        return
+    _boot_executed = True
+
+    boot_file = _get_boot_file()
+    if not boot_file.exists():
         return
 
-    content = BOOT_FILE.read_text(encoding="utf-8").strip()
+    content = boot_file.read_text(encoding="utf-8").strip()
     if not content:
         return
 
     logger.info("Running BOOT.md (%d chars)", len(content))
-
-    # Run in a background thread so we don't block gateway startup.
     thread = threading.Thread(
         target=_run_boot_agent,
         args=(content,),
@@ -85,3 +81,9 @@ async def handle(event_type: str, context: dict) -> None:
         daemon=True,
     )
     thread.start()
+
+
+def register(ctx) -> None:
+    """Register boot-md as an on_session_start hook."""
+    ctx.register_hook("on_session_start", _on_session_start)
+    logger.info("boot-md: registered (triggers on first session start)")

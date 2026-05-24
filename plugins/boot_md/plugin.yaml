@@ -1,0 +1,6 @@
+name: boot-md
+version: 1.0.0
+description: "Run ~/.hermes/BOOT.md as a startup prompt on first session. Useful for startup checklists, cron failure summaries, and daily greetings."
+author: NimbleCo
+hooks:
+  - on_session_start
