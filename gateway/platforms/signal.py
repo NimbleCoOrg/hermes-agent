@@ -662,8 +662,10 @@ class SignalAdapter(BasePlatformAdapter):
 
                 # Voice memos bypass observe_only — you can't add text or
                 # @mention to a voice memo, so requiring mention is impossible.
+                # signal-cli SSE doesn't include a voiceNote flag — detect by
+                # audio content type (audio/aac, audio/ogg, audio/mp4, etc.)
                 is_voice_memo = any(
-                    att.get("voiceNote") or "voice" in str(att.get("flags", "")).lower()
+                    str(att.get("contentType", "")).startswith("audio/")
                     for att in (data_message.get("attachments") or [])
                 )
 
