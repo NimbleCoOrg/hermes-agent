@@ -11,8 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Publish under personal account (org free plan can't make packages public)
-  IMAGE_NAME: juniperbevensee/hermes-agent
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
