@@ -2,7 +2,7 @@ name: Publish Docker Image (Fork)
 
 # Fork-specific workflow. The upstream docker-publish.yml only runs on
 # github.repository == 'NousResearch/hermes-agent'; this workflow handles
-# publishing to GHCR for NimbleCoOrg/hermes-agent.
+# publishing to GHCR for NimbleCoAI/hermes-agent.
 
 on:
   push:
