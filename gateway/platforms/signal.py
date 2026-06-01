@@ -1781,6 +1781,8 @@ class SignalAdapter(BasePlatformAdapter):
 
     async def on_processing_start(self, event: MessageEvent) -> None:
         """React with 👀 when processing begins."""
+        if getattr(event, 'observe_only', False):
+            return
         if not self._reactions_enabled(event):
             return
         target = self._extract_reaction_target(event)
@@ -1793,6 +1795,8 @@ class SignalAdapter(BasePlatformAdapter):
         On CANCELLED we leave the 👀 in place — no terminal outcome means
         the reaction should keep reflecting "in progress" (matches Telegram).
         """
+        if getattr(event, 'observe_only', False):
+            return
         if not self._reactions_enabled(event):
             return
         if outcome == ProcessingOutcome.CANCELLED:

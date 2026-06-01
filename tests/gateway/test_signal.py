@@ -1953,3 +1953,67 @@ class TestSignalGroupV2Routing:
 
         assert len(captured) == 1
         assert captured[0].source.chat_type == "dm"
+
+
+# ---------------------------------------------------------------------------
+# Observe-only reaction suppression
+# ---------------------------------------------------------------------------
+
+class TestObserveOnlyReactionSuppression:
+    """Reactions must NOT fire on observe_only events (mention-gating leak)."""
+
+    def _make_event(self, observe_only=True):
+        from gateway.platforms.base import MessageEvent
+        from gateway.session import SessionSource
+        source = SessionSource(
+            platform=Platform.SIGNAL,
+            chat_id="group123",
+            chat_type="group",
+            user_id="+15559999999",
+        )
+        event = MessageEvent(
+            text="hello everyone",
+            source=source,
+            observe_only=observe_only,
+        )
+        # _extract_reaction_target expects sender + timestamp_ms
+        event.raw_message = {
+            "sender": "+15559999999",
+            "timestamp_ms": 1234567890,
+        }
+        return event
+
+    @pytest.mark.asyncio
+    async def test_on_processing_start_skips_observe_only(self, monkeypatch):
+        adapter = _make_signal_adapter(monkeypatch)
+        adapter.send_reaction = AsyncMock()
+
+        event = self._make_event(observe_only=True)
+        await adapter.on_processing_start(event)
+
+        adapter.send_reaction.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_on_processing_complete_skips_observe_only(self, monkeypatch):
+        from gateway.platforms.base import ProcessingOutcome
+        adapter = _make_signal_adapter(monkeypatch)
+        adapter.send_reaction = AsyncMock()
+        adapter.remove_reaction = AsyncMock()
+
+        event = self._make_event(observe_only=True)
+        await adapter.on_processing_complete(event, ProcessingOutcome.SUCCESS)
+
+        adapter.send_reaction.assert_not_called()
+        adapter.remove_reaction.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_normal_event_still_gets_reactions(self, monkeypatch):
+        """Non-observe_only events should still trigger reactions normally."""
+        adapter = _make_signal_adapter(monkeypatch)
+        adapter.send_reaction = AsyncMock()
+
+        event = self._make_event(observe_only=False)
+
+        await adapter.on_processing_start(event)
+
+        adapter.send_reaction.assert_called_once()
